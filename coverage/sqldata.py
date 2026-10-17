@@ -34,7 +34,7 @@ from coverage.numbits import (
     nums_to_numbits,
     register_sqlite_functions,
 )
-from coverage.sqlitedb import SqliteDb
+from coverage.sqlitedb import SqliteDb, read_only_uri
 from coverage.types import FilePath, TArc, TDebugCtl, TLineNo, TWarnFn
 from coverage.version import __version__
 
@@ -231,6 +231,7 @@ class CoverageData:
         no_disk: bool = False,
         warn: TWarnFn | None = None,
         debug: TDebugCtl | None = None,
+        read_only: bool = False,
     ) -> None:
         """Create a :class:`CoverageData` object to hold coverage-measured data.
 
@@ -244,9 +245,12 @@ class CoverageData:
             warn: a warning callback function, accepting a warning message
                 argument.
             debug: a `DebugControl` object (optional)
+            read_only (bool): if True, the data file will only be read, never
+                written. Use this for data files from other sources.
 
         """
         self._no_disk = no_disk
+        self._read_only = read_only
         self._basename = os.path.abspath(basename or ".coverage")
         self._suffix = suffix
         self._our_suffix = suffix is True
@@ -310,7 +314,12 @@ class CoverageData:
     def _open_db(self) -> None:
         """Open an existing db file, and read its metadata."""
         self._debug_dataio("Opening data file", self._filename)
-        self._dbs[threading.get_ident()] = SqliteDb(self._filename, self._debug, self._no_disk)
+        self._dbs[threading.get_ident()] = SqliteDb(
+            self._filename,
+            self._debug,
+            self._no_disk,
+            self._read_only,
+        )
         self._read_db()
 
     def _read_db(self) -> None:
@@ -756,8 +765,13 @@ class CoverageData:
 
             con.con.create_function("map_path", 1, map_with_fixed_slashes)
 
-            # Attach the other database
-            con.execute_void("ATTACH DATABASE ? AS other_db", (other_data.data_filename(),))
+            # Attach the other database, read-only: we never write to it, and
+            # it might have come from somewhere else, so be as careful as
+            # possible.
+            other_filename = other_data.data_filename()
+            if not other_filename.startswith("file:"):
+                other_filename = read_only_uri(other_filename)
+            con.execute_void("ATTACH DATABASE ? AS other_db", (other_filename,))
 
             # Create temporary table with mapped file paths to avoid repeated map_path() calls
             con.execute_void("""
