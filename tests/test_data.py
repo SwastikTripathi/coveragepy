@@ -1073,6 +1073,37 @@ class CoverageDataFilesTest(CoverageTest):
         self.assert_exists(".coverage.xxx")
         self.assert_exists("cov2/.coverage.xxx")
 
+    @pytest.mark.skipif(env.WINDOWS, reason="Windows lets us delete files in read-only directories")
+    def test_hostile_journal_matches_sqlite(self) -> None:
+        # hostile_journal() builds its bytes by hand.  Check them against a
+        # journal SQLite writes itself.  A commit spanning two databases names
+        # a super-journal at the end of each database's journal.  SQLite
+        # normally deletes the journals when the commit is done, but it can't
+        # delete one in a read-only directory.
+        os.mkdir("two")
+        con = sqlite3.connect("one.db", isolation_level=None)
+        con.execute("attach 'two/two.db' as two")
+        con.execute("create table main.t (x)")
+        con.execute("create table two.t (x)")
+        con.execute("begin")
+        con.execute("insert into main.t values (1)")
+        con.execute("insert into two.t values (1)")
+        os.chmod("two", 0o555)
+        try:
+            con.execute("commit")
+        finally:
+            os.chmod("two", 0o755)
+        # The super-journal is named after the main database, with SQLite's
+        # idea of its full path.  The main database is always listed first.
+        main_path = con.execute("pragma database_list").fetchone()[2]
+        con.close()
+
+        with open("two/two.db-journal", "rb") as fjournal:
+            journal = fjournal.read()
+        super_name = re.search(re.escape(main_path) + r"-mj[0-9A-F]+", journal.decode("latin-1"))
+        assert super_name is not None
+        assert journal.endswith(hostile_journal(super_name.group()))
+
     def test_combining_with_hostile_journal(self) -> None:
         # A data file from somewhere else might have a SQLite journal file
         # beside it.  If we opened the data file read-write, SQLite would roll
