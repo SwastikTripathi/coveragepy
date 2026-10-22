@@ -565,15 +565,23 @@ class ProcessTest(CoverageTest):
             "forkonly.py",
             """\
             import os
+
+            def child_only():
+                print(f"child,{os.getpid()}", flush=True)
+
             print(f"parent,{os.getpid()}", flush=True)
             pid = os.fork()
             if pid == 0:
-                print(f"child,{os.getpid()}", flush=True)
+                child_only()
             else:
                 os.waitpid(pid, 0)
             """,
         )
-        total_lines = 6
+        # Lines covered after combining: import(1), def(3), child_only body(4),
+        # print-parent(6), fork(7), if(8), waitpid(11).  The child's module-level
+        # frame (lines 8-9) is not re-traced after fork, but child_only() is a
+        # fresh frame entered after coverage restarts, so line 4 is captured.
+        total_lines = 7
         self.make_file(".coveragerc", "[run]\npatch = fork\nparallel = true\n")
         out = self.run_command("coverage run forkonly.py")
         pids = {key: int(pid) for key, pid in csv.reader(out.splitlines())}

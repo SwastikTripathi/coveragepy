@@ -1514,6 +1514,7 @@ def _after_fork_in_child() -> None:
     if parent_cov is not None:
         parent_config = parent_cov.config
         parent_cov.stop()
+        parent_cov._auto_save = False  # prevent child from saving parent's pre-fork data
         # Restart with the same configuration the parent had.
         # process_startup() requires COVERAGE_PROCESS_START or
         # COVERAGE_PROCESS_CONFIG to be set, but those are only present
