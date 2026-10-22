@@ -415,7 +415,7 @@ class SysMonitor(Tracer):
             arc = (last_line, -code.co_firstlineno)
             code_info.file_data.add(arc)  # type: ignore
             # log(f"adding {arc=}")
-        code_info.last_line = None
+        code_info.last_line = None  # type: ignore[union-attr]
         return DISABLE
 
     @panopticon("code", "line")
