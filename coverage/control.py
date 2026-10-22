@@ -1529,7 +1529,7 @@ def _after_fork_in_child() -> None:
         child_cov._auto_save = True
         child_cov.start()
         process_startup.coverage = child_cov  # type: ignore[attr-defined]
-    else:
+    else:  # pragma: no cover
         process_startup(force=True, slug="fork")
 
 
