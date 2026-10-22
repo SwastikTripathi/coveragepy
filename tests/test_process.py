@@ -584,7 +584,10 @@ class ProcessTest(CoverageTest):
         total_lines = 7
         self.make_file(".coveragerc", "[run]\npatch = fork\nparallel = true\n")
         out = self.run_command("coverage run forkonly.py")
-        pids = {key: int(pid) for key, pid in csv.reader(out.splitlines())}
+        # Filter to only parent/child lines; atexit handlers may add extra output
+        # when running under metacoverage.
+        pid_lines = [l for l in out.splitlines() if l.startswith(("parent,", "child,"))]
+        pids = {key: int(pid) for key, pid in csv.reader(pid_lines)}
         assert set(pids) == {"parent", "child"}
         self.run_command("coverage combine")
         data = coverage.CoverageData()
