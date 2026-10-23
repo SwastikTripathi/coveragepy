@@ -578,11 +578,13 @@ class ProcessTest(CoverageTest):
             """,
         )
         # Lines covered after combining: import(1), def(3), child_only body(4),
-        # print-parent(6), fork(7), if(8), child_only-call(9), waitpid(11).
-        # Coverage restarts in the child after fork, so the module-level frame
-        # continues to be traced (lines 8-9 are captured in the child) and
-        # child_only() runs as a fresh frame (line 4 is captured).
-        total_lines = 8
+        # print-parent(6), fork(7), if(8), waitpid(11) = 7 lines.
+        # The child_only() call site (line 9) is in the module-level frame that
+        # was already executing when the fork happened.  sys.settrace /
+        # sys.monitoring only applies to newly created frames, so lines in that
+        # inherited frame are not traced in the child.  child_only() itself is a
+        # new frame, so line 4 is captured in the child.
+        total_lines = 7
         self.make_file(".coveragerc", "[run]\npatch = fork\nparallel = true\n")
         out = self.run_command("coverage run forkonly.py")
         # Filter to only parent/child lines; atexit handlers may add extra output
@@ -593,7 +595,7 @@ class ProcessTest(CoverageTest):
         self.run_command("coverage combine")
         data = coverage.CoverageData()
         data.read()
-        # All lines including the child-only line must be covered.
+        # The child-only function body (line 4) must be covered.
         assert line_counts(data)["forkonly.py"] == total_lines
 
     def test_warnings_during_reporting(self) -> None:
