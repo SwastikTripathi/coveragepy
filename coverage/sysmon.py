@@ -415,7 +415,7 @@ class SysMonitor(Tracer):
             arc = (last_line, -code.co_firstlineno)
             code_info.file_data.add(arc)  # type: ignore
             # log(f"adding {arc=}")
-        code_info.last_line = None  # type: ignore[union-attr]
+        code_info.last_line = None  # type: ignore[union-attr]  # pragma: nested
         return DISABLE
 
     @panopticon("code", "line")
@@ -440,13 +440,13 @@ class SysMonitor(Tracer):
         code_info = self.code_infos[id(code)]
         # code_info is not None and code_info.file_data is not None, since we
         # wouldn't have enabled this event if they were.
-        if code_info.last_line is not None:
-            arc = (code_info.last_line, line_number)
+        if code_info.last_line is not None:  # pragma: nested
+            arc = (code_info.last_line, line_number)  # pragma: nested
         else:
-            arc = (line_number, line_number)
+            arc = (line_number, line_number)  # pragma: nested
         code_info.file_data.add(arc)  # type: ignore
         # log(f"adding {arc=}")
-        code_info.last_line = line_number
+        code_info.last_line = line_number  # pragma: nested
         return DISABLE
 
     @panopticon("code", "@", "@")
